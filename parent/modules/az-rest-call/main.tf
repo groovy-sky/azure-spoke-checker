@@ -22,33 +22,43 @@ variable "method" {
   default = "GET"
 }
 
+variable "action"{
+  type = string
+  default = null
+}
+
+// Parses the resource_id to get the subscription_id, resource_group, resource_provider, and resource_type
 locals {
   res_id_split = split("/", var.resource_id)
-  res_id_split_len = length(local.res_id_split)
-  res_type = "${local.res_id_split[local.res_id_split_len - 3]}/${local.res_id_split[local.res_id_split_len - 2]}"
   subscription_id = local.res_id_split[2]
+  resource_group = local.res_id_split[4]
+  res_provider = local.res_id_split[6]
+  res_type = local.res_id_split[7]
 }
 
-
-resource "azapi_resource_action" "resource_action" {
-  type = "${local.res_type}@${var.api_ver}"
+// If action is not null, then perform the action on the resource
+// https://registry.terraform.io/providers/Azure/azapi/latest/docs/resources/azapi_resource_action
+resource "azapi_resource_action" "res_action" {
+  type = "${local.res_provider}/${local.res_type}@${var.api_ver}"
   resource_id = var.resource_id
   method = var.method
+  action = var.action
+  count = var.action == null ? 0 : 1
 }
 
-data "azapi_resource" "resource" {
-  type = "${local.res_type}@${var.api_ver}"
+// If action is null, then get the resource
+// https://registry.terraform.io/providers/Azure/azapi/latest/docs/data-sources/azapi_resource
+data "azapi_resource" "res_info" {
+  type = "${local.res_provider}/${local.res_type}@${var.api_ver}"
   resource_id = var.resource_id
   response_export_values = ["*"]
+  count = var.action == null ? 1 : 0
 }
 
-
-data "azapi_resource_list" "resource_list" {
-  type                   = "${local.res_type}@${var.api_ver}"
-  parent_id              = "/subscriptions/${local.subscription_id}"
-  response_export_values = ["*"]
+output "action_result" {
+  value = resource.azapi_resource_action.res_action
 }
 
-output "resource_list" {
-  value = jsondecode(data.azapi_resource_list.resource_list.output)
+output "resource_information" {
+  value = data.azapi_resource.res_info
 }
