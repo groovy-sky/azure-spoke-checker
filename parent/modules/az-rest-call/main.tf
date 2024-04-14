@@ -60,5 +60,5 @@ output "action_result" {
 }
 
 output "resource_information" {
-  value = data.azapi_resource.res_info
+  value = data.azapi_resource.res_info.*.output
 }
