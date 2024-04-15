@@ -34,6 +34,7 @@ locals {
   resource_group = local.res_id_split[4]
   res_provider = local.res_id_split[6]
   res_type = local.res_id_split[7]
+  res_name = local.res_id_split[8]
 }
 
 // If action is not null, then perform the action on the resource
@@ -61,4 +62,14 @@ output "action_result" {
 
 output "resource_information" {
   value = data.azapi_resource.res_info.*.output
+}
+
+output "parsed_resource_id" {  
+  value = {  
+    subscription_id = local.subscription_id  
+    resource_group  = local.resource_group  
+    resource_provider    = local.res_provider  
+    resource_type        = local.res_type  
+    resource_name        = local.res_name
+  }  
 }
