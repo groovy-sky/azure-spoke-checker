@@ -50,10 +50,11 @@ module "spoke_vnet_check" {
 
 module "subnet_nsg_check"{
   source = "../../modules/az-rest-call" 
-  for_each = toset(local.subnets_nsg)
+  for_each = toset(compact(local.subnets_nsg))
   api_ver = var.api_version
   resource_id = each.value
 }
+
 
 output "vnet_info" {
   value = {
@@ -69,6 +70,14 @@ output "subnets_info" {
     name = s.name  
     udr = try(s.properties.routeTable.id, null)
     nsg = try(s.properties.networkSecurityGroup.id, null)
-    addressPrefixes = try(s.properties.addressPrefixes, null)  
   }]  
+}  
+
+output "nsg_info" {  
+  value = [for s in module.subnet_nsg_check : {  
+    total_rules =  length(jsondecode(s.resource_information[0]).properties.securityRules)
+    nsg_name = jsondecode(s.resource_information[0]).name
+    nsg_id = jsondecode(s.resource_information[0]).id
+  
+    }]  
 }  
