@@ -78,6 +78,5 @@ output "nsg_info" {
     total_rules =  length(jsondecode(s.resource_information[0]).properties.securityRules)
     nsg_name = jsondecode(s.resource_information[0]).name
     nsg_id = jsondecode(s.resource_information[0]).id
-  
     }]  
 }  
