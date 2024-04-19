@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -41,12 +42,15 @@ func main() {
 		log.Fatalf("error running terraform apply: %s", err)
 	}
 
+	// Get the outputs
 	outputs, err := tf.Output(context.Background())
 	if err != nil {
 		log.Fatalf("error getting outputs: %s", err)
 	}
 
 	for name, value := range outputs {
-		log.Printf("Output %s = %s", name, value.Value)
+		fmt.Printf("%s:%s\n", name, string(value.Value))
 	}
+
+	//fmt.Println(string(outputs["vnet_info"].Value))
 }

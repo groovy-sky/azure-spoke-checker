@@ -34,7 +34,7 @@ locals {
 
 // Search for default UDR in the same resource group as Spoke VNet
 module "spoke_vnet_udr_search" {
-  source = "../../modules/az-rest-search"
+  source = "../modules/az-rest-search"
   subscription_id = local.vnet_sub_id
   resource_group = local.vnet_group
   resource_type = "Microsoft.Network/routeTables"
@@ -43,13 +43,13 @@ module "spoke_vnet_udr_search" {
 
 // Obtain the resource information for the Spoke VNet
 module "spoke_vnet_check" {  
-  source = "../../modules/az-rest-call"  
+  source = "../modules/az-rest-call"  
   api_ver = var.api_version
   resource_id = var.spoke_vnet_id
 }
 
 module "subnet_nsg_check"{
-  source = "../../modules/az-rest-call" 
+  source = "../modules/az-rest-call" 
   for_each = toset(compact(local.subnets_nsg))
   api_ver = var.api_version
   resource_id = each.value
