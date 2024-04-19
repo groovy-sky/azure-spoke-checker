@@ -18,6 +18,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .  && chmod 
 # Use the official Hashicorp Terraform image as a base  
 FROM hashicorp/terraform:1.8.1 as tf
 
+FROM mcr.microsoft.com/azure-cli:2.54.0 as az-cli
+
 FROM alpine:3.19
 
 ENV TF tf-files
@@ -27,6 +29,7 @@ COPY ${TF} ${TF}
 
 WORKDIR ${TF}/workflow
 
+COPY --from=az-cli /usr/local/bin/az /bin/az
 COPY --from=tf /bin/terraform /bin/terraform
 COPY --from=builder /opt/main /bin/${WEB}
  
