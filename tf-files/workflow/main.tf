@@ -12,6 +12,7 @@ variable "spoke_vnet_id" {
 
 variable "api_version" {
   type = string
+  default = "2023-09-01"
 }
 
 variable "hub_vnet_id" {
