@@ -26,28 +26,40 @@ type SubnetsInfo struct {
 }
 
 type VNetInfo struct {
-	AddressSpaces []string `json:"address_spaces"`
-	DefaultUDR    string   `json:"default_udr"`
-	PeeringState  []string `json:"peering_state"`
-	PeeringSync   []string `json:"peering_sync"`
+	AddressSpaces []string      `json:"address_spaces"`
+	DefaultUDR    string        `json:"default_udr"`
+	PeeringState  []VNetPeering `json:"peerings"`
 }
 
-type AzureInfo struct {
-	NSGInfo     []NSGInfo     `json:"nsg_info"`
-	SubnetsInfo []SubnetsInfo `json:"subnets_info"`
-	VNetInfo    VNetInfo      `json:"vnet_info"`
+type VNetPeering struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Properties struct {
+		PeeringState         string `json:"peeringState"`
+		PeeringSyncLevel     string `json:"peeringSyncLevel"`
+		RemoteVirtualNetwork struct {
+			ID string `json:"id"`
+		} `json:"remoteVirtualNetwork"`
+	} `json:"properties"`
+	Type string `json:"type"`
 }
 
-type OutputMeta struct {
-	Sensitive bool            `json:"sensitive"`
-	Type      json.RawMessage `json:"type"`
-	Value     json.RawMessage `json:"value"`
+type ReportTable struct {
+	PeeringConnected  bool
+	PeeringSynced     bool
+	CustomNSGRules    bool
+	CustomUDR         bool
+	SubnetsWithoutUDR bool
 }
 
-func runTerraform(spokeId, hubId string) {
+func checkSpokeVNet(spokeId, hubId string) (result string) {
+	var report ReportTable
 	var nsgInfo []NSGInfo
 	var subnetsInfo []SubnetsInfo
 	var vnetInfo VNetInfo
+	var peeringState, peeringSyncLevel string
+
+	log.Printf("[INF] Checking Spoke VNet %s and its connectivity to %s\n", spokeId, hubId)
 
 	tfConfPath, exists := os.LookupEnv("TF_CONF_PATH")
 
@@ -101,7 +113,6 @@ func runTerraform(spokeId, hubId string) {
 				log.Fatalf("error decoding nsg_info: %s", err)
 			}
 			nsgInfo = append(nsgInfo, nsgs...)
-
 		case "subnets_info":
 			var subnets []SubnetsInfo
 			err := json.Unmarshal(value, &subnets)
@@ -109,7 +120,6 @@ func runTerraform(spokeId, hubId string) {
 				log.Fatalf("error decoding subnets_info: %s", err)
 			}
 			subnetsInfo = append(subnetsInfo, subnets...)
-
 		case "vnet_info":
 			err := json.Unmarshal(value, &vnetInfo)
 			if err != nil {
@@ -118,7 +128,104 @@ func runTerraform(spokeId, hubId string) {
 		}
 
 	}
-	fmt.Printf("NSG Info: %v\n", nsgInfo.)
+
+	// Search a peering to hub and get its state
+	for _, peering := range vnetInfo.PeeringState {
+		if strings.ToLower(peering.Properties.RemoteVirtualNetwork.ID) == strings.ToLower(hubId) {
+			peeringState = strings.ToLower(peering.Properties.PeeringState)
+			peeringSyncLevel = strings.ToLower(peering.Properties.PeeringSyncLevel)
+		}
+	}
+
+	if peeringState == "connected" {
+		report.PeeringConnected = true
+	}
+
+	if peeringSyncLevel == "fullyinsync" {
+		report.PeeringSynced = true
+	}
+
+	// Checks that there is no NSG with more than 0 rules
+	for _, nsg := range nsgInfo {
+		if nsg.TotalRules > 0 {
+			fmt.Printf("[INF] NSG %s has %d rules\n", nsg.NSGName, nsg.TotalRules)
+			report.CustomNSGRules = true
+		}
+	}
+
+	// Checks that each subnet has UDR from vnetInfo.DefaultUDR
+	for _, subnet := range subnetsInfo {
+		if subnet.UDR != vnetInfo.DefaultUDR {
+			fmt.Printf("[INF] Subnet %s has UDR %s\n", subnet.Name, subnet.UDR)
+			report.CustomUDR = true
+		}
+	}
+
+	// Translates the report to a human-readable format using ⛔ and ✅ symbols in HTML table
+	result = `
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<title>Azure Spoke Checker</title>
+		<link rel="icon" type="image/x-icon" href="https://www.svgrepo.com/download/473315/network.svg">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+		<style>
+			/* Your custom CSS styles here */
+			table {
+				border-collapse: collapse;
+			}
+			th, td {
+				border: 1px solid #dddddd;
+				text-align: left;
+				padding: 8px;
+			}
+			th {
+				background-color: #f2f2f2;
+			}
+			tr:nth-child(even) {
+				background-color: #f2f2f2;
+			}
+			tr:nth-child(odd) {
+				background-color: #e6e6e6;
+			}
+		</style>
+	</head>
+	<body>
+			
+		<table>	
+			<tr>
+				<th colspan="2">Spoke VNet Report</th>
+			</tr>
+			<tr>
+				<td>` + checkSymbol(report.PeeringConnected) + `</td>
+				<th>Peering Connected</th>
+			</tr>
+			<tr>
+				<td>` + checkSymbol(report.PeeringSynced) + `</td>
+				<th>Peering Synced</th>
+			</tr>
+			<tr>
+				<td>` + checkSymbol(report.CustomNSGRules) + `</td>
+				<th>Custom NSG Rules</th>
+			</tr>
+			<tr>
+				<td>` + checkSymbol(report.CustomUDR) + `</td>
+				<th>Custom UDR</th>
+			</tr>
+		</table>
+	</body>
+	</html>
+	`
+	return result
+
+}
+
+func checkSymbol(check bool) string {
+	if check {
+		return "✅"
+	}
+	return "⛔"
 }
 
 func sanitazeInput(input string) string {
@@ -189,10 +296,11 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	case "POST":
 		r.ParseForm()
 		vnetID := sanitazeInput(r.FormValue("vnetid"))
-		hubId, exists := os.LookupEnv("HUB_VNET_ID")
+		hubID, exists := os.LookupEnv("HUB_VNET_ID")
 		log.Println("VNet ID:", vnetID)
 		if validateResID(vnetID) && exists {
-			runTerraform(vnetID, hubId)
+			response := checkSpokeVNet(vnetID, hubID)
+			w.Write([]byte(response))
 		}
 	}
 }
