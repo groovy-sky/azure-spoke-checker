@@ -13,6 +13,37 @@ import (
 	"github.com/hashicorp/terraform-exec/tfexec"
 )
 
+const HTMLHeader = `
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Azure Spoke Checker</title>
+	<link rel="icon" type="image/x-icon" href="https://www.svgrepo.com/download/473315/network.svg">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
+	<style>
+		/* Your custom CSS styles here */
+		table {
+			border-collapse: collapse;
+		}
+		th, td {
+			border: 1px solid #dddddd;
+			text-align: left;
+			padding: 8px;
+		}
+		th {
+			background-color: #f2f2f2;
+		}
+		tr:nth-child(even) {
+			background-color: #f2f2f2;
+		}
+		tr:nth-child(odd) {
+			background-color: #e6e6e6;
+		}
+	</style>
+</head>
+`
+
 type NSGInfo struct {
 	NSGID      string `json:"nsg_id"`
 	NSGName    string `json:"nsg_name"`
@@ -52,24 +83,32 @@ type ReportTable struct {
 	SubnetsWithoutUDR bool
 }
 
-func reportSummary(report ReportTable) (summary string) {
-	if report.PeeringConnected && report.PeeringSynced {
-		summary += "Connectivity to Hub is correct.<br>"
+func reportWithSummary(report ReportTable) (table, summary string) {
+	if report.PeeringConnected {
+		table += "<tr><td>✅</td><td>Spoke is connected to Hub.</td></tr>"
+		summary += "Spoke is connected.<br>"
 	} else {
-		summary += "Connectivity to Hub is broken or don't exist - please contact Network Hub team about.<br>"
+		table += "<tr><td>⛔</td><td>Connectivity to Hub is broken or doesn't exsist.</td></tr>"
+		summary += "Connectivity is broken - please contact Network Hub team about.<br>"
+		return table, summary
 	}
-
+	if report.PeeringSynced {
+		table += "<tr><td>✅</td><td>Spoke is fully synchronized with Hub.</td></tr>"
+		summary += "Spoke is fully synchronized.<br>"
+	} else {
+		table += "<tr><td>⛔</td><td>Spoke is not fully synchronized with Hub.</td></tr>"
+		summary += "Spoke should be synchronized - please use self-service form for re-configuration and re-run the check.<br>"
+	}
 	if report.CustomNSGRules {
-		summary += "There are NSGs with custom rules - please contact Cloud team about.<br>"
+		table += "<tr><td>⛔</td><td>There are NSGs(one or many) with custom rules.</td></tr>"
+		summary += "Don't use custom rules in NSG - please remove them and re-run the check or contact Cloud team.<br>"
 	}
-	if report.CustomUDR {
-		summary += "There are subnets which uses non-default UDR - please use self-service form for re-configuration and re-run the check.<br>"
-	}
-	if report.SubnetsWithoutUDR {
-		summary += "There are subnets without UDR - please use self-service form for re-configuration and re-run the check.<br>"
+	if report.CustomUDR || report.SubnetsWithoutUDR {
+		table += "<tr><td>⛔</td><td>Some subnets has incorrect UDR assocation(non-default).</td></tr>"
+		summary += "Subnets should have default UDR - please use self-service form for re-configuration and re-run the check.<br>"
 	}
 
-	return summary
+	return table, summary
 }
 
 func checkSpokeVNet(spokeId, hubId string) (result string) {
@@ -182,74 +221,23 @@ func checkSpokeVNet(spokeId, hubId string) (result string) {
 	}
 
 	// Translates the report to a human-readable format using ⛔ and ✅ symbols in HTML table
-	result = `
-	<!DOCTYPE html>
-	<html>
-	<head>
-		<title>Azure Spoke Checker</title>
-		<link rel="icon" type="image/x-icon" href="https://www.svgrepo.com/download/473315/network.svg">
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
-		<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
-		<style>
-			/* Your custom CSS styles here */
-			table {
-				border-collapse: collapse;
-			}
-			th, td {
-				border: 1px solid #dddddd;
-				text-align: left;
-				padding: 8px;
-			}
-			th {
-				background-color: #f2f2f2;
-			}
-			tr:nth-child(even) {
-				background-color: #f2f2f2;
-			}
-			tr:nth-child(odd) {
-				background-color: #e6e6e6;
-			}
-		</style>
-	</head>
+	table, summary := reportWithSummary(report)
+	result = HTMLHeader + `
 	<body>
-			
 		<table>	
 			<tr>
 				<th colspan="2">Spoke VNet Report</th>
 			</tr>
-			<tr>
-				<td>` + checkSymbol(report.PeeringConnected) + `</td>
-				<td>Spoke VNet connection to Hub VNet</td>
-			</tr>
-			<tr>
-				<td>` + checkSymbol(report.PeeringSynced) + `</td>
-				<td>Spoke VNet Synchronization with Hub VNet</td>
-			</tr>
-			<tr>
-				<td>` + checkSymbol(!report.CustomNSGRules) + `</td>
-				<td>There are subnets(one or many) which have NSG witch custom rules</td>
-			</tr>
-			<tr>
-				<td>` + checkSymbol(!report.CustomUDR) + `</td>
-				<td>There are subnets(one or many) which have non-default UDR</td>
-			</tr>
-			<tr>
-				<td> Summary </td>
-				<td width="600">` + reportSummary(report) + `</td>
-			</tr>
+				` + table + `
+				<tr><td> Summary </td> <td width="600">
+			 	` + summary + `
+				</td></tr>
 		</table>
 	</body>
 	</html>
 	`
 	return result
 
-}
-
-func checkSymbol(check bool) string {
-	if check {
-		return "✅"
-	}
-	return "⛔"
 }
 
 func sanitazeInput(input string) string {
@@ -271,41 +259,7 @@ func validateResID(input string) bool {
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
-		w.Write([]byte(`
-		<!DOCTYPE html>
-		<html>
-		<head>
-			<title>Azure Spoke Checker</title>
-			<link rel="icon" type="image/x-icon" href="https://www.svgrepo.com/download/473315/network.svg">
-			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
-			<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
-			<style>
-				/* Your custom CSS styles here */
-				form {
-					margin: 20px;
-					padding: 10px;
-					display: inline-block;
-				}
-				big {
-					margin: 5px;
-					align: center;
-					style: bold;
-				}
-				fieldset {
-					border: none;
-					box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-					margin-bottom: 10px;
-					padding: 5px;
-					width: 20%; 
-				}
-				fieldset:nth-child(odd) {
-					background-color: #f5f5f5; /* Lighter color for odd fieldsets */
-				}
-				fieldset:nth-child(even) {
-					background-color: #ebebeb; /* Darker color for even fieldsets */
-				}
-			</style>
-		</head>
+		w.Write([]byte(HTMLHeader + `
 		<body>
 			<fieldset>
 				<form action="/" method="POST">
