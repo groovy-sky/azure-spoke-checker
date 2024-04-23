@@ -52,6 +52,26 @@ type ReportTable struct {
 	SubnetsWithoutUDR bool
 }
 
+func reportSummary(report ReportTable) (summary string) {
+	if report.PeeringConnected && report.PeeringSynced {
+		summary += "Connectivity to Hub is correct.<br>"
+	} else {
+		summary += "Connectivity to Hub is broken or don't exist - please contact Network Hub team about.<br>"
+	}
+
+	if report.CustomNSGRules {
+		summary += "There are NSGs with custom rules - please contact Cloud team about.<br>"
+	}
+	if report.CustomUDR {
+		summary += "There are subnets which uses non-default UDR - please use self-service form for re-configuration and re-run the check.<br>"
+	}
+	if report.SubnetsWithoutUDR {
+		summary += "There are subnets without UDR - please use self-service form for re-configuration and re-run the check.<br>"
+	}
+
+	return summary
+}
+
 func checkSpokeVNet(spokeId, hubId string) (result string) {
 	var report ReportTable
 	var nsgInfo []NSGInfo
@@ -199,19 +219,23 @@ func checkSpokeVNet(spokeId, hubId string) (result string) {
 			</tr>
 			<tr>
 				<td>` + checkSymbol(report.PeeringConnected) + `</td>
-				<th>Peering Connected</th>
+				<td>Spoke VNet connection to Hub VNet</td>
 			</tr>
 			<tr>
 				<td>` + checkSymbol(report.PeeringSynced) + `</td>
-				<th>Peering Synced</th>
+				<td>Spoke VNet Synchronization with Hub VNet</td>
 			</tr>
 			<tr>
-				<td>` + checkSymbol(report.CustomNSGRules) + `</td>
-				<th>Custom NSG Rules</th>
+				<td>` + checkSymbol(!report.CustomNSGRules) + `</td>
+				<td>There are subnets(one or many) which have NSG witch custom rules</td>
 			</tr>
 			<tr>
-				<td>` + checkSymbol(report.CustomUDR) + `</td>
-				<th>Custom UDR</th>
+				<td>` + checkSymbol(!report.CustomUDR) + `</td>
+				<td>There are subnets(one or many) which have non-default UDR</td>
+			</tr>
+			<tr>
+				<td> Summary </td>
+				<td width="600">` + reportSummary(report) + `</td>
 			</tr>
 		</table>
 	</body>
