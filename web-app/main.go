@@ -283,6 +283,10 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("OK"))
+}
+
 func main() {
 
 	httpInvokerPort, exists := os.LookupEnv("HTTP_PORT")
@@ -292,6 +296,7 @@ func main() {
 		httpInvokerPort = "8080"
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		defaultHandler(w, r)
 	})
