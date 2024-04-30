@@ -22,11 +22,11 @@ variable "hub_vnet_id" {
 locals {  
   spoke_sub_id = module.spoke_vnet_check.parsed_resource_id.subscription_id
   spoke_rg = module.spoke_vnet_check.parsed_resource_id.resource_group
-  spoke_name = module.spoke_vnet_check.resource_information[0].name
+  spoke_name = jsondecode(module.spoke_vnet_check.resource_information[0]).name
   spoke_default_udr = "${local.spoke_name}-udr"
-  peerings = try(module.spoke_vnet_check.resource_information[0].properties.virtualNetworkPeerings,null)
-  vnet_ips = module.spoke_vnet_check.resource_information[0].properties.addressSpace.addressPrefixes
-  subnets = try(module.spoke_vnet_check.resource_information[0].properties.subnets, null)
+  peerings = try(jsondecode(module.spoke_vnet_check.resource_information[0]).properties.virtualNetworkPeerings,null)
+  vnet_ips = jsondecode(module.spoke_vnet_check.resource_information[0]).properties.addressSpace.addressPrefixes
+  subnets = try(jsondecode(module.spoke_vnet_check.resource_information[0]).properties.subnets, null)
   subnets_nsg = [for s in local.subnets : try(s.properties.networkSecurityGroup.id, null)]
   depends-on = [module.spoke_vnet_check]
 }  
@@ -72,8 +72,8 @@ output "subnets_info" {
 
 output "nsg_info" {  
   value = [for s in module.subnet_nsg_check : {  
-    total_rules =  length(s.resource_information[0].properties.securityRules)
-    nsg_name = s.resource_information[0].name
-    nsg_id = s.resource_information[0].id
+    total_rules =  length(jsondecode(s.resource_information[0]).properties.securityRules)
+    nsg_name = jsondecode(s.resource_information[0]).name
+    nsg_id = jsondecode(s.resource_information[0]).id
     }]  
 }  

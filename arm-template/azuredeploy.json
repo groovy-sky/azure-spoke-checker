@@ -1,0 +1,151 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "appName": {
+            "defaultValue": "spoke-checker",
+            "type": "String"
+        },
+        "appImage": {
+            "type": "String",
+            "defaultValue": "docker.io/gr00vysky/spoke-checker:latest"
+        },
+        "manageIdentityName": {
+            "type": "String",
+            "defaultValue": "managed-identity"
+        },
+        "hubVnetID":{
+            "type": "string"
+        },
+          "location": {
+          "type": "string",
+          "defaultValue": "[resourceGroup().location]"
+        }
+    },
+    "variables": {
+      "appPlan": "[concat('appPlan-',uniquestring(concat(resourceGroup().id,subscription().id)))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.App/managedEnvironments",
+            "apiVersion": "2023-08-01-preview",
+            "name": "[variables('appPlan')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "zoneRedundant": false,
+                "kedaConfiguration": {},
+                "daprConfiguration": {},
+                "customDomainConfiguration": {},
+                "peerAuthentication": {
+                    "mtls": {
+                        "enabled": false
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+            "apiVersion": "2023-07-31-preview",
+            "name": "[parameters('manageIdentityName')]",
+            "location": "[parameters('location')]"
+        },
+        {
+            "type": "Microsoft.App/containerapps",
+            "apiVersion": "2023-08-01-preview",
+            "name": "[parameters('appName')]",
+            "location": "[parameters('location')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.App/managedEnvironments', variables('appPlan'))]"
+            ],
+            "identity": {
+                "type": "UserAssigned",
+                "userAssignedIdentities": {
+                    "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('manageIdentityName'))]": {}
+            }},
+            "properties": {
+                "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('appPlan'))]",
+                "environmentId": "[resourceId('Microsoft.App/managedEnvironments', variables('appPlan'))]",
+                "configuration": {
+                    "activeRevisionsMode": "Single",
+                    "ingress": {
+                        "external": true,
+                        "targetPort": 8080,
+                        "exposedPort": 0,
+                        "transport": "Auto",
+                        "traffic": [
+                            {
+                                "weight": 100,
+                                "latestRevision": true
+                            }
+                        ],
+                        "allowInsecure": true,
+                        "clientCertificateMode": "Ignore",
+                        "stickySessions": {
+                            "affinity": "none"
+                        }
+                    }
+                },
+                "template": {
+                    "containers": [
+                        {
+                            "image": "[parameters('appImage')]",
+                            "name": "[parameters('appName')]",
+                            "env": [
+                                {
+                                    "name": "HUB_VNET_ID",
+                                    "value": "[parameters('hubVnetID')]"
+                                },
+                                {
+                                    "name": "ARM_USE_MSI",
+                                    "value": "true"
+                                },
+                                {
+                                    "name": "ARM_TENANT_ID",
+                                    "value": "[subscription().tenantId]"
+                                },
+                                {
+                                    "name": "ARM_SUBSCRIPTION_ID",
+                                    "value": "[subscription().subscriptionId]"
+                                },
+                                {
+                                    "name": "ARM_CLIENT_ID",
+                                    "value": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', parameters('manageIdentityName'))).clientId]"
+                                }
+                            ],
+                            "resources": {
+                                "cpu": 0.5,
+                                "memory": "1Gi"
+                            },
+                            "probes": [
+                                {
+                                    "type": "Liveness",
+                                    "httpGet": {
+                                        "path": "/",
+                                        "port": 8080,
+                                        "scheme": "HTTP"
+                                    },
+                                    "periodSeconds": 10
+                                }
+                            ]
+                        }
+                    ],
+                    "scale": {
+                        "minReplicas": 0,
+                        "maxReplicas": 10
+                    },
+                    "volumes": []
+                }
+            }
+        }
+    ],
+    "outputs": {
+        "containerAppId": {
+            "type": "string",
+            "value": "[resourceId('Microsoft.App/containerapps', parameters('appName'))]"
+        },
+      "containerAppUrl": {
+        "type": "string",
+        "value": "[reference(resourceId('Microsoft.App/containerapps', parameters('appName'))).configuration.ingress.fqdn]"
+      }
+    }
+  }
