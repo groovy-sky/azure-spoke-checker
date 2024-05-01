@@ -60,6 +60,7 @@ type VNetInfo struct {
 	AddressSpaces []string      `json:"address_spaces"`
 	DefaultUDR    string        `json:"default_udr"`
 	PeeringState  []VNetPeering `json:"peerings"`
+	DNS           []string      `json:"dns"`
 }
 
 type VNetPeering struct {
@@ -81,6 +82,7 @@ type ReportTable struct {
 	CustomNSGRules    bool
 	CustomUDR         bool
 	SubnetsWithoutUDR bool
+	DNSmatch          bool
 }
 
 func reportWithSummary(report ReportTable) (table, summary string) {
@@ -100,7 +102,7 @@ func reportWithSummary(report ReportTable) (table, summary string) {
 		summary += "Spoke should be synchronized - please use self-service form for re-configuration and re-run the check.<br>"
 	}
 	if report.CustomNSGRules {
-		table += "<tr><td>⛔</td><td>There are NSGs(one or many) with custom rules.</td></tr>"
+		table += "<tr><td>🔔</td><td>There are NSGs(one or many) with custom rules.</td></tr>"
 		summary += "Don't use custom rules in NSG - please remove them and re-run the check or contact Cloud team.<br>"
 	}
 	if report.CustomUDR || report.SubnetsWithoutUDR {
@@ -135,25 +137,33 @@ func checkSpokeVNet(spokeId, hubId string) (result string) {
 
 	tf, err := tfexec.NewTerraform(tfConfPath, tfBinPath)
 	if err != nil {
-		log.Fatalf("error creating tfexec instance: %s", err)
+		log.Printf("[ERR] tfexec instance creation: %s", err)
+		return "Something went wrong. Please try again later."
 	}
+
+	ctx := context.Background()
 
 	// Initialize Terraform
-	err = tf.Init(context.Background(), tfexec.Upgrade(true))
+	err = tf.Init(ctx, tfexec.Upgrade(true))
 	if err != nil {
-		log.Fatalf("error running terraform init: %s", err)
+		log.Printf("[ERR] terraform init: %s", err)
+		return "Something went wrong. Please try again later."
 	}
 
+	defer tf.Destroy(ctx, tfexec.Var("spoke_vnet_id="+spokeId), tfexec.Var("hub_vnet_id="+hubId))
+
 	// Apply the Terraform configuration
-	err = tf.Apply(context.Background(), tfexec.Var("spoke_vnet_id="+spokeId), tfexec.Var("hub_vnet_id="+hubId))
+	err = tf.Apply(ctx, tfexec.Var("spoke_vnet_id="+spokeId), tfexec.Var("hub_vnet_id="+hubId))
 	if err != nil {
-		log.Fatalf("error running terraform apply: %s", err)
+		log.Printf("[ERR] terraform apply: %s", err)
+		return "Couln't obtain the information about the Spoke VNet. Please check resource ID and try again."
 	}
 
 	// Get the outputs
-	outputs, err := tf.Output(context.Background())
+	outputs, err := tf.Output(ctx)
 	if err != nil {
-		log.Fatalf("error running terraform output: %s", err)
+		log.Printf("[ERR] terraform output: %s", err)
+		return "Something went wrong. Please try again later."
 	}
 
 	for key, output := range outputs {
@@ -220,7 +230,31 @@ func checkSpokeVNet(spokeId, hubId string) (result string) {
 		}
 	}
 
-	// Translates the report to a human-readable format using ⛔ and ✅ symbols in HTML table
+	defaultDNS, exists := os.LookupEnv("DEFAULT_DNS")
+	var allowedDNS []string
+
+	if exists {
+		allowedDNS = strings.Split(defaultDNS, ",")
+	}
+
+	if len(allowedDNS) == len(vnetInfo.DNS) {
+		fmt.Println("[INF] DNS Address:", allowedDNS, "VNet DNS:", vnetInfo.DNS, len(allowedDNS))
+	}
+
+	// Checks that Spoke DNS IPs (if DEFAULT_DNS is defined) are in the allowed DNS list or (if DEFAULT_DNS is not defined) is empty list
+	if len(vnetInfo.DNS) == 0 {
+		report.DNSmatch = true
+	} else {
+		for _, dns := range vnetInfo.DNS {
+			for _, allowed := range allowedDNS {
+				if dns == allowed {
+					report.DNSmatch = true
+				}
+			}
+		}
+	}
+
+	// Draws HTML table with the results
 	table, summary := reportWithSummary(report)
 	result = HTMLHeader + `
 	<body>
@@ -279,6 +313,8 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 		if validateResID(vnetID) && exists {
 			response := checkSpokeVNet(vnetID, hubID)
 			w.Write([]byte(response))
+		} else {
+			w.Write([]byte("Invalid VNet ID has been provided."))
 		}
 	}
 }

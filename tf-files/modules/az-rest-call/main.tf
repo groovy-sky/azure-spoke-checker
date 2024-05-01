@@ -57,11 +57,11 @@ data "azapi_resource" "res_info" {
 }
 
 output "action_result" {
-  value = resource.azapi_resource_action.res_action
+  value = try(resource.azapi_resource_action.res_action,null)
 }
 
 output "resource_information" {
-  value = data.azapi_resource.res_info.*.output
+  value = try(data.azapi_resource.res_info.*.output,null)
 }
 
 output "parsed_resource_id" {  

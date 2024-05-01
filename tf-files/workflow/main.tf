@@ -6,9 +6,15 @@ terraform {
   }
 }
 
-variable "spoke_vnet_id" {
-  type = string
-}
+variable "spoke_vnet_id" {  
+  type        = string  
+  description = "The ID of the Azure VNet"  
+  
+  validation {  
+    condition     = can(regex("^/subscriptions/[a-zA-Z0-9-]*/resourceGroups/[a-zA-Z0-9-_]*/providers/Microsoft.Network/virtualNetworks/[a-zA-Z0-9-_]*$", var.spoke_vnet_id))  
+    error_message = "The spoke_vnet_id must be a valid Azure VNet resource ID."  
+  }  
+}   
 
 variable "api_version" {
   type = string
@@ -59,6 +65,7 @@ output "vnet_info" {
   default_udr = try(jsondecode(module.spoke_vnet_udr_search.rg_resource_list[0]).value[0].id,null)
   address_spaces = local.vnet_ips
   peerings = local.peerings
+  dns = try(jsondecode(module.spoke_vnet_check.resource_information[0]).properties.dhcpOptions.dnsServers,null)
   }
 }
 
