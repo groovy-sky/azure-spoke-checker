@@ -82,7 +82,7 @@ type ReportTable struct {
 	CustomNSGRules    bool
 	CustomUDR         bool
 	SubnetsWithoutUDR bool
-	DNSmatch          bool
+	DNSmismatch       bool
 }
 
 func reportWithSummary(report ReportTable) (table, summary string) {
@@ -109,8 +109,22 @@ func reportWithSummary(report ReportTable) (table, summary string) {
 		table += "<tr><td>⛔</td><td>Some subnets has incorrect UDR assocation(non-default).</td></tr>"
 		summary += "Subnets should have default UDR - please use self-service form for re-configuration and re-run the check.<br>"
 	}
+	if report.DNSmismatch {
+		table += "<tr><td>🔔</td><td>Spoke DNS IPs are not in the allowed DNS list.</td></tr>"
+		summary += "DNS IPs should be in the allowed list - please use self-service form for re-configuration and re-run the check.<br>"
+	}
 
 	return table, summary
+}
+
+func contains(s []string, e string) bool {
+	// Checks if a string slice contains a specific string
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 func checkSpokeVNet(spokeId, hubId string) (result string) {
@@ -243,15 +257,17 @@ func checkSpokeVNet(spokeId, hubId string) (result string) {
 
 	// Checks that Spoke DNS IPs (if DEFAULT_DNS is defined) are in the allowed DNS list or (if DEFAULT_DNS is not defined) is empty list
 	if len(vnetInfo.DNS) == 0 {
-		report.DNSmatch = true
+		if len(allowedDNS) > 0 {
+			report.DNSmismatch = true
+		}
 	} else {
+		// Walks through Spoke DNS IPs and checks if any of them is not in the allowed DNS list
 		for _, dns := range vnetInfo.DNS {
-			for _, allowed := range allowedDNS {
-				if dns == allowed {
-					report.DNSmatch = true
-				}
+			if !contains(allowedDNS, dns) {
+				report.DNSmismatch = true
 			}
 		}
+
 	}
 
 	// Draws HTML table with the results
@@ -331,6 +347,12 @@ func main() {
 	} else {
 		httpInvokerPort = "8080"
 	}
+
+	_, exists = os.LookupEnv("HUB_VNET_ID")
+	if !exists {
+		log.Fatal("[ERR] HUB_VNET_ID is not defined.")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
