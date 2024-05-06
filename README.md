@@ -4,7 +4,16 @@
 
 ## Introduction
  
-Azure Spoke Checker is a web application, built using Golang, designed to streamline and automate the validation of a Spoke Virtual Network (VNet) within a Hub-Spoke topology in Microsoft Azure. For those unfamiliar with the term, a Hub-Spoke topology is a network configuration where a central 'Hub' VNet communicates with multiple 'Spoke' VNets, akin to the hub and spokes of a bicycle wheel.
+Azure Spoke Checker is a web app for Azure Virtual Network connectivity check tool. Using it, you can evaluate Virtual Network's (aka Spoke) connected to central Virtual Network (aka Hub) in Microsoft Azure Cloud. You can easily  
+
+web application, built using Golang, designed to streamline and automate the validation of a Spoke Virtual Network (VNet) within a Hub-Spoke topology in Microsoft Azure. For those unfamiliar with the term, a Hub-Spoke topology is a network configuration where a central 'Hub' VNet communicates with multiple 'Spoke' VNets, akin to the hub and spokes of a bicycle wheel.
+
+Azure Spoke Checker was designed to:
+
+* Increase efficiency and accuracy by automating manual checks of network configurations, saving time and reducing errors.
+* Promote compliance and security by verifying important network settings such as UDRs, NSGs, and DNS.
+* Assist in troubleshooting and diagnostics by uncovering potential issues with connectivity or configuration.
+* Provide reporting and documentation of the Spoke VNet's configuration for reference and auditing purposes.
 
 ## Overview
 
@@ -15,17 +24,6 @@ The application simplifies the process of network validation by carrying out the
 * The application processes this data and generates an easy-to-understand, detailed report.
 * The report checks if the Spoke is correctly connected to the Hub, whether each subnet is linked to the right UDR, if NSGs are correctly configured, and if the DNS is on an approved IP list.
 
-## Real-World Application
-
-For example, in a real-world scenario, a network administrator could use Azure Spoke Checker to automate manual checks of the network, saving valuable time and reducing the chance of human error. It could also help ensure that the network is secure and compliant with company policies by checking UDRs, NSGs, and DNS settings. If there are any connectivity or configuration issues, the tool can aid in troubleshooting by identifying potential problems. Finally, it provides a useful report that documents the Spoke VNet's configuration, useful for both current and future reference.
-Purpose
- 
-Azure Spoke Checker was designed to:
-
-* Increase efficiency and accuracy by automating manual checks of network configurations, saving time and reducing errors.
-* Promote compliance and security by verifying important network settings such as UDRs, NSGs, and DNS.
-* Assist in troubleshooting and diagnostics by uncovering potential issues with connectivity or configuration.
-* Provide reporting and documentation of the Spoke VNet's configuration for reference and auditing purposes.
 
 ## Related materials
 

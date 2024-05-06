@@ -4,7 +4,7 @@ FROM golang:alpine3.19 as builder
 ENV WEB web-app
 
 # Copy go mod and sum files  
-COPY  ${WEB}/* /opt
+COPY  ${WEB}/* /opt/
 
 # Set working directory  
 WORKDIR /opt

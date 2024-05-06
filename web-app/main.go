@@ -18,14 +18,15 @@ const HTMLHeader = `
 <html>
 <head>
 	<title>Azure Spoke Checker</title>
-	<link rel="icon" type="image/x-icon" href="https://www.svgrepo.com/download/473315/network.svg">
+	<link rel="icon" type="image/x-icon" href="https://raw.githubusercontent.com/groovy-sky/azure-spoke-checker/main/logo.svg">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.min.css">
 	<style>
 		/* Your custom CSS styles here */
-		table {
-			border-collapse: collapse;
-		}
+		table {  
+			border-collapse: collapse;  
+			margin: 20px; 
+		} 
 		th, td {
 			border: 1px solid #dddddd;
 			text-align: left;
@@ -86,32 +87,38 @@ type ReportTable struct {
 }
 
 func reportWithSummary(report ReportTable) (table, summary string) {
+
 	if report.PeeringConnected {
-		table += "<tr><td>✅</td><td>Spoke is connected to Hub.</td></tr>"
-		summary += "Spoke is connected.<br>"
+		table += "<tr><td>✅</td><td>VNet Peering is connected.</td></tr>"
 	} else {
 		table += "<tr><td>⛔</td><td>Connectivity to Hub is broken or doesn't exsist.</td></tr>"
-		summary += "Connectivity is broken - please contact Network Hub team about.<br>"
+		summary += "No active connection, between Hub and Spoke, were found. Connect VNet to Hub. <br>"
 		return table, summary
 	}
 	if report.PeeringSynced {
-		table += "<tr><td>✅</td><td>Spoke is fully synchronized with Hub.</td></tr>"
-		summary += "Spoke is fully synchronized.<br>"
+		table += "<tr><td>✅</td><td>VNet Peering is fully synchronized.</td></tr>"
 	} else {
 		table += "<tr><td>⛔</td><td>Spoke is not fully synchronized with Hub.</td></tr>"
-		summary += "Spoke should be synchronized - please use self-service form for re-configuration and re-run the check.<br>"
+		summary += "Spoke's address space was modified. Sync the virtual network peer to Hub VNet.<br>"
 	}
 	if report.CustomNSGRules {
-		table += "<tr><td>🔔</td><td>There are NSGs(one or many) with custom rules.</td></tr>"
-		summary += "Don't use custom rules in NSG - please remove them and re-run the check or contact Cloud team.<br>"
+		table += "<tr><td>🔔</td><td>Some Spoke subnets uses non-empty NSGs.</td></tr>"
 	}
-	if report.CustomUDR || report.SubnetsWithoutUDR {
-		table += "<tr><td>⛔</td><td>Some subnets has incorrect UDR assocation(non-default).</td></tr>"
-		summary += "Subnets should have default UDR - please use self-service form for re-configuration and re-run the check.<br>"
+	if report.CustomUDR {
+		table += "<tr><td>🔔</td><td>Some Spoke subnets uses non-default UDR.</td></tr>"
+	}
+	if report.SubnetsWithoutUDR {
+		table += "<tr><td>🔔</td><td>Some Spoke subnets don't have UDR association.</td></tr>"
 	}
 	if report.DNSmismatch {
-		table += "<tr><td>🔔</td><td>Spoke DNS IPs are not in the allowed DNS list.</td></tr>"
-		summary += "DNS IPs should be in the allowed list - please use self-service form for re-configuration and re-run the check.<br>"
+		table += "<tr><td>🔔</td><td>Spoke VNet uses non-default DNS.</td></tr>"
+	}
+
+	if summary == "" {
+		summary = "No significant issues were observed."
+		if report.CustomNSGRules || report.CustomUDR || report.DNSmismatch || report.SubnetsWithoutUDR {
+			summary += "If you have any connectivity issues - try to check sections with 🔔 symbol."
+		}
 	}
 
 	return table, summary
@@ -276,7 +283,7 @@ func checkSpokeVNet(spokeId, hubId string) (result string) {
 	<body>
 		<table>	
 			<tr>
-				<th colspan="2">Spoke VNet Report</th>
+				<th colspan="2" align="center"> <center> Azure Spoke Checker's report </center> </th>
 			</tr>
 				` + table + `
 				<tr><td> Summary </td> <td width="600">
@@ -311,13 +318,22 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		w.Write([]byte(HTMLHeader + `
 		<body>
+		<table>
+		<tr>
+				<th colspan="2" align="center"> <center>Spoke VNet ID: </center> </th>
+			</tr>
+			<tr>
+				<th colspan="2" align="center"> 
 			<fieldset>
+			<br>
 				<form action="/" method="POST">
-					<label for="vnetid">Spoke VNet ID:</label>
 					<input type="text" id="resid" name="vnetid" value="" required /><br>
-					<input type="submit" value="Submit">
+					<center><input type="submit" value="Submit"></center>
 				</form>
 			</fieldset>
+			</th>
+			</tr>
+		</table>
 		</body>
 		</html>
 		`))
