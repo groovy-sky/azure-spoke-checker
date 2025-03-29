@@ -4,9 +4,7 @@
 
 ## Introduction
  
-Azure Spoke Checker is a web app for Azure Virtual Network connectivity check tool. Using it, you can evaluate Virtual Network's (aka Spoke) connected to central Virtual Network (aka Hub) in Microsoft Azure Cloud. You can easily  
-
-web application, built using Golang, designed to streamline and automate the validation of a Spoke Virtual Network (VNet) within a Hub-Spoke topology in Microsoft Azure. For those unfamiliar with the term, a Hub-Spoke topology is a network configuration where a central 'Hub' VNet communicates with multiple 'Spoke' VNets, akin to the hub and spokes of a bicycle wheel.
+Azure Spoke Checker is a web app for Azure Virtual Network connectivity check tool. Using it, you can evaluate Virtual Network's (aka Spoke) connected to central Virtual Network (aka Hub) in Microsoft Azure Cloud. It is a web application, built using Golang, designed to streamline and automate the validation of a Spoke Virtual Network (VNet) within a Hub-Spoke topology in Microsoft Azure.
 
 Azure Spoke Checker was designed to:
 
